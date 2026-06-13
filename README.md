@@ -1,91 +1,59 @@
-# LithoMesh: Sublinear Disaster Recovery Sync
+# LithoMesh: Feasibility of Subterranean Mesh Sync & Reconciliation
 
-**LithoMesh Runtime v0.1** is a "Severable Edge Database" synchronization protocol designed for absolute worst-case physical environments: **Disaster Recovery and Emergency Triage.**
+**LithoMesh** is an experimental systems research project investigating the boundaries of underground wireless sensor networks (WSNs). Specifically, it aggressively tests the feasibility of combining **Seismic/Acoustic Clock Synchronization**, **Synchronous Flooding (Glossy)**, and **Fixed-Memory IBLT-based CRDT State Reconciliation** in harsh, offline environments.
 
-When infrastructure is shattered (hurricanes, earthquakes) and cloud connectivity is zero, emergency responders rely on physical movement to sync data. A vehicle drives from Triage Center A to Checkpoint B, establishing a brief 30-second radio link (LoRa/BLE) to synchronize missing medical records and supply logs. 
+**Status:** Research & Validation Phase  
+**Target Publication Venues:** IPSN, EWSN, SenSys, IEEE IoT-J
 
-Standard databases fail in these conditions because they rely on roundtrip "20 Questions" (Merkle Trees) or easily-drifted clocks (Timestamp logs). **LithoMesh uses an Invertible Bloom Lookup Table (IBLT) mathematically optimized to synchronize databases over sparse, high-latency, lossy radio links in exactly 2 roundtrips.**
-
-## 🏆 The Benchmark: Merkle Tree vs LithoMesh
-
-Over a simulated LoRa radio link (1000ms latency, 10 kbps bandwidth) syncing a 10,000-event database where exactly 50 events are missing:
-
-| Protocol | Roundtrips | Payload TX | Total Sync Time |
-| :--- | :--- | :--- | :--- |
-| **Merkle Tree (Standard)** | 15 | 15,016 bytes | **42.01 seconds** (Fails 30s drive-by) |
-| **LithoMesh (IBLT)** | **2** | **1,100 bytes** | **4.88 seconds** (Survives) |
-
-*Conclusion:* LithoMesh is **8.6x faster** in high-latency, sparse-divergence scenarios, enabling successful synchronization before vehicles drive out of radio range.
+> **Note:** This project is explicitly **not** designed for commercial deployment. Strict regulatory limits (e.g., ETSI 1% duty cycle for 868MHz), underground physics (RF multi-path, acoustic jitter), and fundamental mathematical bounds of static IBLTs present hard limits to commercial viability. This repository exists to document exactly *where* and *why* these systems fail, and under what narrow envelopes they succeed.
 
 ---
 
-## ⚙️ The Level 4 Hardware Gauntlet
+## 🔬 Core Research Hypotheses & Findings
 
-To prove the runtime survives physical constraints (Peak RAM, Stack Pressure, RF Noise), the C++ Engine is subjected to the **Level 4 Hardware Gauntlet**, simulating UART/Radio transmission between two ESP32 microcontrollers. 
+### 1. Bounded-Memory CRDT State Sync via Fixed IBLT
+CRDTs accumulate tombstones indefinitely, destroying memory on embedded devices during prolonged offline periods. LithoMesh attempts to use a fixed-memory Invertible Bloom Lookup Table (IBLT) to act as a garbage-collected summary of state.
+*   **Current Finding:** Implemented template-based static C++ engine requiring `1,328 bytes` of RAM. Tested over simulated LoRa with Reed-Solomon FEC framing.
+*   **Mathematical Boundary:** An IBLT of $M$ cells can successfully peel a divergence $D$ only if $M > 1.5 \times D$. If $D$ exceeds this threshold (e.g., extended offline state generation), the decode fails gracefully. 
 
-### Output Results (v0.1)
+### 2. Seismic/Acoustic Clock Synchronization
+Can a physical acoustic pulse (e.g., a hammer strike on rock) provide <10 µs jitter time-sync for underground nodes without GPS?
+*   **Hypothesis Limit:** If acoustic jitter exceeds >10 µs, Time Division Multiple Access (TDMA) and synchronous flooding collapse. 
 
-```text
-============================================
- LITHOMESH RUNTIME v0.1 - TEST GAUNTLET
-============================================
-
---- RUN 1: Healthy Sync (1000/50) ---
-   Decode Success    : PASS
-   Decode Iterations : 112 (Proves Sublinear CPU scaling)
-   Recovery Ratio    : 50/50
-   Time to Converge  : 17.96 ms
-
---- RUN 2: Corruption Injection ---
-   Expected: Decode abort, state unchanged. Actual: Aborted (PASS)
-   *Note: IBLT checksums inherently prevent "evil partial merges" common in distributed systems.*
-
---- RUN 3: Packet Loss Matrix ---
-   Loss 1%  -> FAIL (Graceful abort)
-   Loss 10% -> FAIL (Graceful abort)
-   Loss 30% -> FAIL (Graceful abort)
-   *Note: The protocol relies on Forward Error Correction (FEC) or Transport Layers (BLE/TCP) to guarantee payload integrity. If a byte drops, the hash sums don't match the checksums, and the engine aborts cleanly.*
-
---- RUN 4: Divergence Threshold (Break Point) ---
-   Divergence 50 events   -> PASS (Decoded)
-   Divergence 100 events  -> PASS (Decoded)
-   Divergence 150 events  -> PASS (Decoded)
-   Divergence 200 events  -> FAIL (Threshold Exceeded)
-   Divergence 500 events  -> FAIL (Threshold Exceeded)
-   Divergence 1000 events -> FAIL (Threshold Exceeded)
-   *Note: With M=200 cells allocated, mathematics dictate the IBLT can peel a divergence (D) if M > 1.5 * D. 150 passes, 200 fails. Theory perfectly aligns with observed reality.*
-
---- RUN 5: SOAK 100 (Memory Leak Test) ---
-   Cycles Completed : 100
-   Failures         : 0
-   Total Soak Time  : 1368.18 ms
-   Peak Heap Delta  : 0 Bytes (Pure Static Allocation)
-```
+### 3. Global Synchronous Flooding via Constructive Interference
+Extending the Glossy architecture (Ferrari et al., IPSN'11) to underground environments where multi-path reflections and severe attenuation dominate.
 
 ---
 
-## 🛠 Architecture and Protections
+## 🛣️ Research Roadmap
 
-1. **Static Memory Allocation:** LithoMesh uses template-based C++ static allocation (no `malloc()`). It requires approximately **`1,328 bytes`** of RAM for the engine state. There are no heap leaks.
-2. **Idempotency Guard:** An embedded Bloom Filter instantly rejects duplicate `log_event()` insertions.
-3. **Avalanche Hashing:** To avoid the trap of IBLT index collisions on sequential IDs (e.g., event `1`, `2`, `3`), LithoMesh uses the highly distributive `WangHash` over the weak `FNV-1a` to ensure perfect hash distribution without the CPU penalty of `SHA256`.
+### Phase 0: The Hard Stops (Current)
+*   **IBLT Math:** Formally prove when fixed IBLT bounds succeed (e.g., $D < M/1.22$ for $K=3$).
+*   **Regulatory & Propagation:** Replicate Vuran/Akyildiz underground 868 MHz path-loss models in simulation.
+
+### Phase 1: Lab Prototypes
+*   **Acoustic Sync Testbed:** Build hammer-pulse experiment. Measure sync jitter on 3 nodes via accelerometers. *(Gate: <10 µs jitter required).*
+*   **Glossy on ESP32:** Port synchronous flooding to ESP32. Chart delivery ratio vs. alignment error.
+*   **Piezo Harvester Bench:** Measure µW output under mine-spectrum vibrations.
+
+### Phase 2: Simulation & Field
+*   **NS3 Simulation:** Model 500-1000 nodes with real underground propagation models.
+*   **IBLT Emulation:** Simulate 72h divergence within a fixed 2 MB IBLT and observe failure cascading.
+
+### Phase 3: Targeted Publications
+1.  *Seismic Time Synchronization for Underground Wireless Sensor Networks* (Focusing on why acoustic sync cannot achieve sub-microsecond precision).
+2.  *Fixed-Memory IBLT-Based CRDT State Reconciliation: Feasibility and Limits* (Systems paper).
+3.  *Level 4 Gauntlet: Embedded IBLT Reconciliation Engine Validation Framework* (Toolkit paper based on this repository).
 
 ---
 
-## 🚀 Getting Started (ESP32 Hardware Test)
+## 🛠️ The Level 4 Gauntlet (IBLT Validation Framework)
 
-If you have two ESP32 microcontrollers, you can physically run the Level 4 Gauntlet over a UART cable.
+This repository houses the **Level 4 Gauntlet**, an embedded framework for validating IBLT reconciliation over simulated noisy transports.
 
-1. Open `esp32_firmware/Level4_Round1_Serial/Level4_Round1_Serial.ino`.
-2. Flash to **Node A** (`#define IS_NODE_A true`).
-3. Flash to **Node B** (`#define IS_NODE_A false`).
-4. Cross-wire GPIO 17 to 16, GPIO 16 to 17, and share Ground.
-5. Open the Serial Monitor on Node A and type commands to inject failure:
-   * `SYNC` - Run the baseline healthy sync.
-   * `CORRUPT` - Flip bits mid-flight to prove rejection.
-   * `REBOOT` - Trigger a hard `ESP.restart()` mid-sync.
-   * `LOSS 20` - Simulate 20% dropped bytes over the wire.
-   * `DIVERGE 500` - Deliberately crash the mathematics to find the crossover boundary.
+*   **Test A (Healthy):** Proves sublinear CPU scaling (Decode Iterations).
+*   **Test B (Loss/FEC):** Proves Reed-Solomon error correction mathematically recovers 30% byte loss without triggering naive round-trip NACKs.
+*   **Test C (Threshold Exceedance):** Deliberately explodes the mathematics to prove the $M > 1.5 \times D$ failure boundary.
+*   **Test D (Soak):** 100 consecutive syncs proving 0-byte heap leakage due to pure static allocation.
 
-### License
-Apache-2.0 License.
+*Run the framework:* `python simulation/level4_gauntlet.py` and `python simulation/fec_integration_test.py`
