@@ -97,9 +97,11 @@ public:
     }
 
     bool decode(uint32_t* added, size_t max_added, size_t* added_count,
-                uint32_t* removed, size_t max_removed, size_t* removed_count) {
+                uint32_t* removed, size_t max_removed, size_t* removed_count,
+                size_t* out_iterations = nullptr) {
         *added_count = 0;
         *removed_count = 0;
+        if (out_iterations) *out_iterations = 0;
         
         size_t pure_cells[M_CELLS];
         size_t pure_count = 0;
@@ -144,6 +146,8 @@ public:
                 }
             }
         }
+
+        if (out_iterations) *out_iterations = iterations;
 
         // 3. Verify completeness
         for (size_t i = 0; i < M_CELLS; i++) {
