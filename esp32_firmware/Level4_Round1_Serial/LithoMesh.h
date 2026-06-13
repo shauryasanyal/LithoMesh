@@ -7,23 +7,21 @@
 #include <string.h>
 
 // ==========================================
-// Fast Hash Function (FNV-1a for embedded)
+// Fast Hash Function (Wang Hash for embedded)
 // ==========================================
-// We drop heavy crypto (like SHA256) for a fast, hardware-friendly hash.
-inline uint32_t fnv1a_hash(uint32_t key, uint32_t seed) {
-    uint32_t hash = 2166136261u;
-    hash ^= (key & 0xFF); hash *= 16777619u;
-    hash ^= ((key >> 8) & 0xFF); hash *= 16777619u;
-    hash ^= ((key >> 16) & 0xFF); hash *= 16777619u;
-    hash ^= ((key >> 24) & 0xFF); hash *= 16777619u;
-    
-    hash ^= (seed & 0xFF); hash *= 16777619u;
-    hash ^= ((seed >> 8) & 0xFF); hash *= 16777619u;
-    return hash;
+// We drop heavy crypto (like SHA256) but need strong avalanche for sequential IDs.
+inline uint32_t wang_hash(uint32_t key, uint32_t seed) {
+    key = key ^ seed;
+    key = (key ^ 61) ^ (key >> 16);
+    key = key + (key << 3);
+    key = key ^ (key >> 4);
+    key = key * 0x27d4eb2d;
+    key = key ^ (key >> 15);
+    return key;
 }
 
-inline uint32_t iblt_hash_check(uint32_t key) {
-    return fnv1a_hash(key, 0xDEADBEEF);
+    inline uint32_t iblt_hash_check(uint32_t key) {
+    return wang_hash(key, 0xDEADBEEF);
 }
 
 // ==========================================
@@ -40,14 +38,14 @@ public:
 
     void add(uint32_t item) {
         for (uint8_t i = 0; i < NUM_HASHES; i++) {
-            uint32_t idx = fnv1a_hash(item, i) % NUM_BITS;
+            uint32_t idx = wang_hash(item, i) % NUM_BITS;
             bit_array[idx / 8] |= (1 << (idx % 8));
         }
     }
 
     bool contains(uint32_t item) const {
         for (uint8_t i = 0; i < NUM_HASHES; i++) {
-            uint32_t idx = fnv1a_hash(item, i) % NUM_BITS;
+            uint32_t idx = wang_hash(item, i) % NUM_BITS;
             if (!(bit_array[idx / 8] & (1 << (idx % 8)))) {
                 return false;
             }
@@ -80,7 +78,7 @@ public:
 
     void insert(uint32_t key) {
         for (uint8_t i = 0; i < K_HASHES; i++) {
-            uint32_t idx = fnv1a_hash(key, i) % M_CELLS;
+            uint32_t idx = wang_hash(key, i) % M_CELLS;
             cells[idx].count += 1;
             cells[idx].keySum ^= key;
             cells[idx].hashSum ^= iblt_hash_check(key);
@@ -97,11 +95,9 @@ public:
     }
 
     bool decode(uint32_t* added, size_t max_added, size_t* added_count,
-                uint32_t* removed, size_t max_removed, size_t* removed_count,
-                size_t* out_iterations = nullptr) {
+                uint32_t* removed, size_t max_removed, size_t* removed_count) {
         *added_count = 0;
         *removed_count = 0;
-        if (out_iterations) *out_iterations = 0;
         
         size_t pure_cells[M_CELLS];
         size_t pure_count = 0;
@@ -135,7 +131,7 @@ public:
                 
                 // Remove the peeled key from its K_HASHES locations
                 for (uint8_t j = 0; j < K_HASHES; j++) {
-                    uint32_t idx = fnv1a_hash(k, j) % M_CELLS;
+                    uint32_t idx = wang_hash(k, j) % M_CELLS;
                     cells[idx].count -= c;
                     cells[idx].keySum ^= k;
                     cells[idx].hashSum ^= h;
@@ -146,8 +142,6 @@ public:
                 }
             }
         }
-
-        if (out_iterations) *out_iterations = iterations;
 
         // 3. Verify completeness
         for (size_t i = 0; i < M_CELLS; i++) {
