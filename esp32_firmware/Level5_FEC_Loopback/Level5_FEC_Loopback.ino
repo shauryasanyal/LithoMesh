@@ -52,26 +52,32 @@ void diverge(int amount) {
     }
 }
 
+// Global buffers to save stack space inside the loopTask
+static uint8_t raw_payload[2400];
+static uint8_t data[DATA_BLOCKS][BLOCK_SIZE];
+static uint8_t parity[BLOCK_SIZE];
+static LoraPacket received_packets[DATA_BLOCKS + 1];
+static bool packet_received[DATA_BLOCKS + 1];
+static uint8_t recovered_data[DATA_BLOCKS][BLOCK_SIZE];
+static uint8_t received_parity[BLOCK_SIZE];
+static uint8_t reconstructed_payload[2400];
+static uint32_t added_buf[200], removed_buf[200];
+
 bool run_loopback_cycle(int burst_loss, bool print_metrics) {
     uint32_t t_start = millis();
     uint32_t heap_start = ESP.getFreeHeap();
     
     // --- 1. GENERATE ---
-    uint8_t raw_payload[2400];
     memcpy(raw_payload, &nodeA.iblt.cells, sizeof(nodeA.iblt.cells));
     
-    uint8_t data[DATA_BLOCKS][BLOCK_SIZE];
     for(int i=0; i<DATA_BLOCKS; i++) {
         memcpy(data[i], raw_payload + (i * BLOCK_SIZE), BLOCK_SIZE);
     }
     
     // --- 2. ENCODE (FEC Parity) ---
-    uint8_t parity[BLOCK_SIZE];
     LithoMeshXORErasure<DATA_BLOCKS, BLOCK_SIZE>::generate_parity(data, parity);
 
     // --- 3. DROP PACKET (Simulated Air) ---
-    LoraPacket received_packets[DATA_BLOCKS + 1];
-    bool packet_received[DATA_BLOCKS + 1];
     for(int i=0; i<=DATA_BLOCKS; i++) packet_received[i] = true;
     
     // Inject burst loss (sequential packets dropped)
@@ -90,8 +96,6 @@ bool run_loopback_cycle(int burst_loss, bool print_metrics) {
     }
     
     // --- 4. RECOVER (Node B) ---
-    uint8_t recovered_data[DATA_BLOCKS][BLOCK_SIZE];
-    uint8_t received_parity[BLOCK_SIZE];
     int missing_count = 0;
     int first_missing_idx = -1;
     
@@ -124,21 +128,20 @@ bool run_loopback_cycle(int burst_loss, bool print_metrics) {
     if (!fec_success) return false;
 
     // --- 5. DECODE ---
-    uint8_t reconstructed_payload[2400];
     for(int i=0; i<DATA_BLOCKS; i++) {
         memcpy(reconstructed_payload + (i * BLOCK_SIZE), recovered_data[i], BLOCK_SIZE);
     }
 
-    IBLT<200, 3> incoming_iblt;
+    // Static memory for decode
+    static IBLT<200, 3> incoming_iblt;
     memcpy(&incoming_iblt.cells, reconstructed_payload, sizeof(incoming_iblt.cells));
 
-    IBLT<200, 3> delta;
+    static IBLT<200, 3> delta;
     incoming_iblt.subtract(nodeB.iblt, delta);
 
-    uint32_t added[200], removed[200];
     size_t added_count = 0, removed_count = 0, iterations = 0;
     
-    bool success = delta.decode(added, 200, &added_count, removed, 200, &removed_count, &iterations);
+    bool success = delta.decode(added_buf, 200, &added_count, removed_buf, 200, &removed_count, &iterations);
     
     if (print_metrics) {
         uint32_t t_end = millis();
