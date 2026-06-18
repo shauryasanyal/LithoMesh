@@ -1,11 +1,12 @@
+
 # LithoMesh: Feasibility of Subterranean Mesh Sync & Reconciliation
 
-**LithoMesh** is an experimental systems research project investigating the boundaries of underground wireless sensor networks (WSNs). Specifically, it aggressively tests the feasibility of combining bounded-memory CRDT reconciliation, seismic-acoustic time synchronization, and energy-harvested embedded computing for **offline-first, truly decentralized infrastructure**.
+**LithoMesh** is an experimental systems research project investigating the boundaries of underground wireless sensor networks (WSNs). Specifically, it aggressively tests the feasibility of combining Conflict-free Replicated Data Types (CRDTs), acoustic synchronization, and synchronous flooding in extreme RF environments.
 
 **Status:** Research & Validation Phase  
 **Target Publication Venues:** IPSN, EWSN, SenSys, IEEE IoT-J
 
-> **Note:** This project is explicitly **not** designed for commercial deployment. Strict regulatory limits (e.g., ETSI 1% duty cycle for 868MHz), underground physics (RF multi-path, acoustic jitter), and embedded resource constraints create hard scientific boundaries. This research is *intentionally* designed to prove what is *infeasible*, not to enable unconstrained underground mesh networks.
+> **Note:** This project is explicitly **not** designed for commercial deployment. Strict regulatory limits (e.g., ETSI 1% duty cycle for 868MHz), underground physics (RF multi-path, acoustic jitter), and energy constraints make real deployment non-trivial. This is a **feasibility study**, not production code.
 
 ---
 
@@ -17,7 +18,7 @@
 
 Published on GitHub: **June 18, 2026** at [https://github.com/shauryasanyal/LithoMesh](https://github.com/shauryasanyal/LithoMesh)
 
-All commits, documentation, and code herein constitute public disclosure under patent law. Any patent application claiming priority to innovations disclosed in this repository **after this date** may be challenged as anticipated by prior art.
+All commits, documentation, and code herein constitute public disclosure under patent law. Any patent application claiming priority to innovations disclosed in this repository **after this date** will face invalidation challenges based on prior art.
 
 ### Core Innovations (Prior Art Notice)
 
@@ -42,7 +43,7 @@ The following innovations are hereby publicly disclosed and dedicated to prevent
 
 The author grants **all users a perpetual, worldwide, royalty-free, irrevocable patent license** to use any patents that may issue for the innovations contained in this repository.
 
-If any third party attempts to file a patent claiming priority to innovations disclosed in this repository, the author reserves the right to assert prior art based on this public release and GitHub commit history.
+If any third party attempts to file a patent claiming priority to innovations disclosed in this repository, the author reserves the right to assert prior art based on this public release and GitHub timestamps.
 
 **This project is dedicated to preventing proprietary lockdown of decentralized, offline-first infrastructure.**
 
@@ -50,23 +51,23 @@ If any third party attempts to file a patent claiming priority to innovations di
 
 ## 📜 License
 
-This project is licensed under the **Apache License 2.0** with the following additional protections:
+This project is licensed under the **GNU AFFERO GENERAL PUBLIC LICENSE v3 (AGPLv3)** with the following additional protections:
 
 - All innovations herein are released as prior art
-- Any derivative commercial projects must comply with Apache 2.0 terms
+- Any derivative network/cloud-based projects must comply with AGPLv3 terms (source code sharing requirement)
 - Patent claims over public disclosures in this repository may be challenged
 
-See [LICENSE](LICENSE) for full terms.
+See [LICENSE](LICENSE) for full terms and defensive patent grant.
 
 ---
 
 ## 🔬 Core Research Hypotheses & Findings
 
 ### 1. Bounded-Memory CRDT State Sync via Fixed IBLT
-CRDTs accumulate tombstones indefinitely, destroying memory on embedded devices during prolonged offline periods. LithoMesh attempts to use a fixed-memory Invertible Bloom Lookup Table (IBLT) to achieve sublinear state reconciliation with *provable* memory bounds.
+CRDTs accumulate tombstones indefinitely, destroying memory on embedded devices during prolonged offline periods. LithoMesh attempts to use a fixed-memory Invertible Bloom Lookup Table (IBLT) to achieve **bounded-state reconciliation**.
 
 *   **Current Finding:** Implemented template-based static C++ engine requiring `1,328 bytes` of RAM. Tested over simulated LoRa with Reed-Solomon FEC framing.
-*   **Mathematical Boundary:** An IBLT of $M$ cells can successfully peel a divergence $D$ only if $M > 1.5 \times D$. If $D$ exceeds this threshold (e.g., extended offline state generation), the synchronization fails catastrophically (all cells remain encoded). This paper proves when this is *acceptable* for underground infrastructure.
+*   **Mathematical Boundary:** An IBLT of $M$ cells can successfully peel a divergence $D$ only if $M > 1.5 \times D$. If $D$ exceeds this threshold (e.g., extended offline state generation), the peel fails.
 
 ### 2. Seismic/Acoustic Clock Synchronization
 Can a physical acoustic pulse (e.g., a hammer strike on rock) provide <10 µs jitter time-sync for underground nodes without GPS?
